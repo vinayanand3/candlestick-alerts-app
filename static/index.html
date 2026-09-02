@@ -429,12 +429,12 @@
 
         <!-- LEVEL 1: Action / State Header -->
         <div class="hero-action-section">
-          <div id="heroActionBadge" class="hero-badge wait">
-            <span id="heroActionText">🟡 WAIT / CALL WATCH</span>
-            <span id="heroSetupTag" style="font-size: 10px; font-weight: 700; opacity: 0.85;">PULLBACK</span>
+          <div id="heroActionBadge" class="hero-badge none">
+            <span id="heroActionText">LOADING MARKET DATA</span>
+            <span id="heroSetupTag" style="font-size: 10px; font-weight: 700; opacity: 0.85;">--</span>
           </div>
           <div id="heroActionSub" class="hero-status-sub">
-            Waiting for confirmation triggers. 2 of 3 criteria met.
+            Connecting to the analysis API...
           </div>
         </div>
 
@@ -442,26 +442,26 @@
         <div class="score-section">
           <div class="score-header-row">
             <div class="score-big">
-              <span id="valSignalScore" style="color: #fff; font-size: 26px;">74</span><span>/100</span>
+              <span id="valSignalScore" style="color: #fff; font-size: 26px;">0</span><span>/100</span>
             </div>
-            <div id="scoreTierBadge" class="score-tier-pill p2">STRONG WATCH</div>
+            <div id="scoreTierBadge" class="score-tier-pill none">LOADING</div>
           </div>
 
           <div class="layer-meters">
             <div class="meter-row">
               <span style="width: 80px;">1. Context</span>
-              <div class="meter-track"><div id="mFillContext" class="meter-fill ctx" style="width: 85%;"></div></div>
-              <strong id="mTxtContext" style="width: 45px; text-align: right;">30/35</strong>
+              <div class="meter-track"><div id="mFillContext" class="meter-fill ctx" style="width: 0;"></div></div>
+              <strong id="mTxtContext" style="width: 45px; text-align: right;">0/35</strong>
             </div>
             <div class="meter-row">
               <span style="width: 80px;">2. Setup</span>
-              <div class="meter-track"><div id="mFillSetup" class="meter-fill stp" style="width: 80%;"></div></div>
-              <strong id="mTxtSetup" style="width: 45px; text-align: right;">28/35</strong>
+              <div class="meter-track"><div id="mFillSetup" class="meter-fill stp" style="width: 0;"></div></div>
+              <strong id="mTxtSetup" style="width: 45px; text-align: right;">0/35</strong>
             </div>
             <div class="meter-row">
               <span style="width: 80px;">3. Confirm</span>
-              <div class="meter-track"><div id="mFillConfirm" class="meter-fill cnf" style="width: 53%;"></div></div>
-              <strong id="mTxtConfirm" style="width: 45px; text-align: right;">16/30</strong>
+              <div class="meter-track"><div id="mFillConfirm" class="meter-fill cnf" style="width: 0;"></div></div>
+              <strong id="mTxtConfirm" style="width: 45px; text-align: right;">0/30</strong>
             </div>
           </div>
         </div>
@@ -489,7 +489,7 @@
           </div>
 
           <!-- Options Contract Intelligence Box -->
-          <div id="optionsIntelBox" style="margin-top: 8px; background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 6px; padding: 8px 10px;">
+          <div id="optionsIntelBox" style="display: none; margin-top: 8px; background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 6px; padding: 8px 10px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
               <span style="font-size: 9.5px; font-weight: 800; color: #60a5fa; text-transform: uppercase; letter-spacing: 0.5px;">ESTIMATED OPTION SCENARIO</span>
               <span id="optTypeBadge" style="font-size: 9px; font-weight: 800; background: rgba(16, 185, 129, 0.2); color: var(--call); padding: 1px 5px; border-radius: 3px;">0-1 DTE</span>
@@ -517,20 +517,7 @@
         <div class="evidence-section">
           <div class="section-title">TRIGGER CHECKLIST & THESIS</div>
           <div id="triggerChecklist" class="trigger-checklist">
-            <div class="trigger-item">
-              <div class="trigger-status-icon met">✓</div>
-              <div class="trigger-details">
-                <div class="trigger-cond">Trend Alignment (EMA Stack)</div>
-                <div class="trigger-curr">EMA 9 >= 21 >= 50 confirmed</div>
-              </div>
-            </div>
-            <div class="trigger-item">
-              <div class="trigger-status-icon pending">⏳</div>
-              <div class="trigger-details">
-                <div class="trigger-cond">RVOL Volume Surge >= 1.25x</div>
-                <div class="trigger-curr">Current: 0.95x avg (Waiting for spike)</div>
-              </div>
-            </div>
+            <div style="color:var(--text-muted);font-size:11px;">Awaiting analysis...</div>
           </div>
         </div>
 
