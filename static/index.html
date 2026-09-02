@@ -1,0 +1,1082 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>V5 Institutional Command Center | TSLA • AAPL • NVDA • META • QQQ</title>
+  <link rel="icon" href="data:," />
+  <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+  <script src="./config.js"></script>
+  <style>
+    :root {
+      --bg: #070a10;
+      --card-bg: #0e141f;
+      --panel-border: rgba(255, 255, 255, 0.07);
+      --text: #f1f5f9;
+      --text-muted: #8290a5;
+      --text-dim: #556277;
+      --accent: #3b82f6;
+      --call: #10b981;
+      --call-bg: rgba(16, 185, 129, 0.12);
+      --call-border: rgba(16, 185, 129, 0.4);
+      --put: #ef4444;
+      --put-bg: rgba(239, 68, 68, 0.12);
+      --put-border: rgba(239, 68, 68, 0.4);
+      --wait: #f59e0b;
+      --wait-bg: rgba(245, 158, 11, 0.12);
+      --wait-border: rgba(245, 158, 11, 0.4);
+      --purple: #8b5cf6;
+      --purple-bg: rgba(139, 92, 246, 0.12);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Top Navigation Header */
+    header {
+      background: var(--card-bg);
+      border-bottom: 1px solid var(--panel-border);
+      padding: 6px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    .brand { display: flex; align-items: center; gap: 8px; }
+    .brand-dot {
+      width: 8px; height: 8px; background: var(--call); border-radius: 50%;
+      box-shadow: 0 0 8px var(--call);
+    }
+    .brand-title { font-size: 13px; font-weight: 800; letter-spacing: 0.5px; color: #fff; }
+
+    .symbol-tabs {
+      display: flex;
+      background: #080c14;
+      border: 1px solid var(--panel-border);
+      border-radius: 6px;
+      padding: 2px;
+      gap: 2px;
+    }
+
+    .sym-tab {
+      background: transparent; color: var(--text-muted); border: none;
+      padding: 5px 12px; border-radius: 5px; font-size: 11.5px; font-weight: 700;
+      cursor: pointer; transition: all 0.15s ease;
+    }
+    .sym-tab:hover { color: #fff; background: rgba(255, 255, 255, 0.05); }
+    .sym-tab.active { background: var(--accent); color: #fff; }
+    .sym-tab.qqq-tab.active { background: var(--purple); }
+
+    .controls-right { display: flex; align-items: center; gap: 8px; }
+
+    .clock-pill {
+      font-size: 11px; font-weight: 700; color: #60a5fa;
+      background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3);
+      padding: 3px 8px; border-radius: 5px;
+    }
+
+    .tf-group { display: flex; background: #080c14; border: 1px solid var(--panel-border); border-radius: 5px; padding: 2px; }
+    .tf-btn { background: transparent; border: none; padding: 3px 8px; font-size: 11px; color: var(--text-muted); border-radius: 4px; cursor: pointer; }
+    .tf-btn.active { background: #1e293b; color: #fff; font-weight: 700; }
+
+    .btn-toggle {
+      background: #0e141f; border: 1px solid var(--panel-border); color: var(--text);
+      padding: 4px 9px; border-radius: 5px; font-size: 11.5px; cursor: pointer;
+    }
+    .btn-toggle.active { border-color: var(--accent); color: #60a5fa; }
+
+    /* Main Grid: 75% Chart / 25% Command Center */
+    .main-layout {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 360px;
+      overflow: hidden;
+    }
+
+    /* Left Chart */
+    .chart-section {
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--panel-border);
+      background: var(--bg);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .chart-header {
+      padding: 8px 16px;
+      background: rgba(14, 20, 31, 0.85);
+      border-bottom: 1px solid var(--panel-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    .stock-meta { display: flex; align-items: baseline; gap: 10px; }
+    .stock-symbol { font-size: 17px; font-weight: 800; color: #fff; }
+    .stock-price { font-size: 17px; font-weight: 700; color: #fff; }
+    .stock-change { font-size: 12px; font-weight: 600; }
+    .stock-change.up { color: var(--call); }
+    .stock-change.down { color: var(--put); }
+
+    .regime-pill {
+      font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+      padding: 3px 8px; border-radius: 4px; border: 1px solid var(--panel-border);
+    }
+    .regime-pill.up { background: var(--call-bg); border-color: var(--call-border); color: var(--call); }
+    .regime-pill.down { background: var(--put-bg); border-color: var(--put-border); color: var(--put); }
+    .regime-pill.range { background: rgba(139, 92, 246, 0.12); border-color: rgba(139, 92, 246, 0.35); color: var(--purple); }
+
+    #chart-container { flex: 1; width: 100%; height: 100%; }
+
+    /* Right Rail: 5-Tier Command Center */
+    .command-center {
+      background: var(--card-bg);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      border-left: 1px solid var(--panel-border);
+    }
+    .command-center::-webkit-scrollbar { width: 4px; }
+    .command-center::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.12); border-radius: 2px; }
+
+    /* LEVEL 1: Primary Action / State Badge */
+    .hero-action-section {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--panel-border);
+      background: #0a0f18;
+    }
+
+    .hero-badge {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      border-radius: 7px;
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .hero-badge.call { background: var(--call-bg); border: 1.5px solid var(--call-border); color: var(--call); }
+    .hero-badge.put { background: var(--put-bg); border: 1.5px solid var(--put-border); color: var(--put); }
+    .hero-badge.wait { background: var(--wait-bg); border: 1.5px solid var(--wait-border); color: var(--wait); }
+    .hero-badge.none { background: #131b28; border: 1.5px solid var(--panel-border); color: var(--text-muted); }
+    .hero-badge.qqq { background: var(--purple-bg); border: 1.5px solid rgba(139, 92, 246, 0.4); color: #a78bfa; }
+
+    .hero-status-sub {
+      font-size: 11px;
+      color: #94a3b8;
+      line-height: 1.35;
+    }
+
+    /* LEVEL 2: Confidence / Score Tier */
+    .score-section {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--panel-border);
+    }
+
+    .score-header-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .score-big { font-size: 26px; font-weight: 900; color: #fff; }
+    .score-big span { font-size: 13px; color: var(--text-dim); font-weight: 600; }
+    .score-tier-pill {
+      font-size: 10px; font-weight: 800; text-transform: uppercase;
+      padding: 3px 8px; border-radius: 4px; letter-spacing: 0.5px;
+    }
+    .score-tier-pill.p1 { background: var(--call-bg); color: var(--call); border: 1px solid var(--call-border); }
+    .score-tier-pill.p2 { background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.35); }
+    .score-tier-pill.watch { background: var(--wait-bg); color: var(--wait); border: 1px solid var(--wait-border); }
+    .score-tier-pill.none { background: #1e293b; color: var(--text-muted); }
+
+    /* Single-Glance Horizontal Meters */
+    .layer-meters {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      font-size: 10.5px;
+    }
+
+    .meter-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      color: var(--text-muted);
+    }
+
+    .meter-track {
+      flex: 1; height: 5px; background: #172030; border-radius: 3px; overflow: hidden;
+    }
+    .meter-fill { height: 100%; border-radius: 3px; transition: width 0.3s ease; }
+    .meter-fill.ctx { background: var(--accent); }
+    .meter-fill.stp { background: var(--call); }
+    .meter-fill.cnf { background: var(--purple); }
+
+    /* LEVEL 3: Execution Plan */
+    .execution-section {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--panel-border);
+    }
+
+    .section-title {
+      font-size: 10px; font-weight: 800; text-transform: uppercase; color: var(--text-dim);
+      letter-spacing: 0.6px; margin-bottom: 8px;
+    }
+
+    .exec-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+
+    .exec-card {
+      background: #090e17;
+      border: 1px solid var(--panel-border);
+      border-radius: 6px;
+      padding: 7px 10px;
+    }
+
+    .exec-label { font-size: 9px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 2px; }
+    .exec-val { font-size: 12px; font-weight: 800; color: #fff; }
+    .exec-val.target { color: var(--call); }
+    .exec-val.stop { color: var(--put); }
+    .exec-val.trail { color: var(--wait); }
+
+    /* LEVEL 4: Evidence & Next Trigger Checklist */
+    .evidence-section {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--panel-border);
+      flex: 1;
+    }
+
+    .trigger-checklist {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .trigger-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 7px;
+      font-size: 11px;
+      line-height: 1.35;
+      padding: 5px 8px;
+      border-radius: 5px;
+      background: #090e17;
+      border: 1px solid var(--panel-border);
+    }
+
+    .trigger-status-icon { font-size: 11px; font-weight: 800; flex-shrink: 0; }
+    .trigger-status-icon.met { color: var(--call); }
+    .trigger-status-icon.pending { color: var(--wait); }
+
+    .trigger-details { flex: 1; }
+    .trigger-cond { font-weight: 600; color: #e2e8f0; }
+    .trigger-curr { font-size: 10px; color: var(--text-muted); margin-top: 1px; }
+
+    /* LEVEL 5: Collapsible Audit Trail */
+    .audit-section {
+      background: #080c14;
+      border-top: 1px solid var(--panel-border);
+    }
+
+    .audit-header {
+      padding: 9px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--text-muted);
+      cursor: pointer;
+      user-select: none;
+    }
+    .audit-header:hover { color: #fff; }
+
+    .audit-body {
+      max-height: 180px;
+      overflow-y: auto;
+      padding: 0 12px 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .audit-body::-webkit-scrollbar { width: 4px; }
+    .audit-body::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 2px; }
+
+    .audit-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 5px 8px;
+      background: #0d121c;
+      border-radius: 5px;
+      border: 1px solid var(--panel-border);
+      font-size: 10.5px;
+    }
+    .audit-row.call { border-left: 3px solid var(--call); }
+    .audit-row.put { border-left: 3px solid var(--put); }
+    .audit-row.exit { border-left: 3px solid var(--text-muted); }
+    .audit-row.rot { border-left: 3px solid var(--purple); }
+
+    /* Footer */
+    footer {
+      background: #06090e;
+      border-top: 1px solid var(--panel-border);
+      padding: 4px 16px;
+      font-size: 11px;
+      color: var(--text-dim);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+    }
+
+    @media (max-width: 900px) {
+      body { height: auto; min-height: 100vh; overflow: auto; }
+      header { align-items: flex-start; flex-wrap: wrap; gap: 8px; }
+      .symbol-tabs { order: 3; width: 100%; overflow-x: auto; }
+      .sym-tab { flex: 0 0 auto; }
+      .controls-right { flex-wrap: wrap; justify-content: flex-end; }
+      .main-layout { grid-template-columns: 1fr; overflow: visible; }
+      .chart-section { height: 52vh; min-height: 360px; border-right: 0; }
+      .command-center { border-left: 0; border-top: 1px solid var(--panel-border); overflow: visible; }
+      footer { position: static; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Navigation -->
+  <header>
+    <div class="brand">
+      <div class="brand-dot"></div>
+      <div class="brand-title">V5 COMMAND CENTER</div>
+    </div>
+
+    <div class="symbol-tabs">
+      <button class="sym-tab active" onclick="selectSymbol('SPX', this)">🏛️ SPX Options</button>
+      <button class="sym-tab" onclick="selectSymbol('NDX', this)">📊 NDX Options</button>
+      <button class="sym-tab" onclick="selectSymbol('TSLA', this)">TSLA</button>
+      <button class="sym-tab" onclick="selectSymbol('AAPL', this)">AAPL</button>
+      <button class="sym-tab" onclick="selectSymbol('NVDA', this)">NVDA</button>
+      <button class="sym-tab" onclick="selectSymbol('META', this)">META</button>
+      <button class="sym-tab qqq-tab" onclick="selectSymbol('QQQ', this)">⚡ QQQ Tactical</button>
+    </div>
+
+    <div class="controls-right">
+      <div id="liveClock" class="clock-pill">--:--:-- ET</div>
+
+      <div class="tf-group">
+        <button class="tf-btn" onclick="setTimeframe('1m', this)">1m</button>
+        <button class="tf-btn" onclick="setTimeframe('5m', this)">5m</button>
+        <button class="tf-btn active" onclick="setTimeframe('15m', this)">15m</button>
+        <button class="tf-btn" onclick="setTimeframe('1h', this)">1h</button>
+        <button class="tf-btn" onclick="setTimeframe('1d', this)">1D</button>
+      </div>
+
+      <button id="modeBtn" class="btn-toggle" onclick="toggleMode()">
+        <span id="modeIcon">🔴</span> <span id="modeText">Live</span>
+      </button>
+
+      <button class="btn-toggle" onclick="fetchAnalysis()" title="Refresh">↻</button>
+    </div>
+  </header>
+
+  <!-- Main Layout -->
+  <div class="main-layout">
+
+    <!-- Chart (75%) -->
+    <div class="chart-section">
+      <div class="chart-header">
+        <div class="stock-meta">
+          <span id="hdrSymbol" class="stock-symbol">TSLA</span>
+          <span id="hdrPrice" class="stock-price">--</span>
+          <span id="hdrChange" class="stock-change">--</span>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <div id="marketRiskBadge" class="regime-pill" style="font-size: 10.5px;">RISK: NORMAL</div>
+          <div id="regimeBadge" class="regime-pill up">TRENDING UP</div>
+        </div>
+      </div>
+      <div id="chart-container"></div>
+    </div>
+
+    <!-- Command Center (25%) -->
+    <div class="command-center">
+
+      <!-- Dynamic Mode Switch (Equity vs QQQ Macro) -->
+      <div id="equityView">
+
+        <!-- LEVEL 1: Action / State Header -->
+        <div class="hero-action-section">
+          <div id="heroActionBadge" class="hero-badge wait">
+            <span id="heroActionText">🟡 WAIT / CALL WATCH</span>
+            <span id="heroSetupTag" style="font-size: 10px; font-weight: 700; opacity: 0.85;">PULLBACK</span>
+          </div>
+          <div id="heroActionSub" class="hero-status-sub">
+            Waiting for confirmation triggers. 2 of 3 criteria met.
+          </div>
+        </div>
+
+        <!-- LEVEL 2: Confidence / Score Tier -->
+        <div class="score-section">
+          <div class="score-header-row">
+            <div class="score-big">
+              <span id="valSignalScore" style="color: #fff; font-size: 26px;">74</span><span>/100</span>
+            </div>
+            <div id="scoreTierBadge" class="score-tier-pill p2">STRONG WATCH</div>
+          </div>
+
+          <div class="layer-meters">
+            <div class="meter-row">
+              <span style="width: 80px;">1. Context</span>
+              <div class="meter-track"><div id="mFillContext" class="meter-fill ctx" style="width: 85%;"></div></div>
+              <strong id="mTxtContext" style="width: 45px; text-align: right;">30/35</strong>
+            </div>
+            <div class="meter-row">
+              <span style="width: 80px;">2. Setup</span>
+              <div class="meter-track"><div id="mFillSetup" class="meter-fill stp" style="width: 80%;"></div></div>
+              <strong id="mTxtSetup" style="width: 45px; text-align: right;">28/35</strong>
+            </div>
+            <div class="meter-row">
+              <span style="width: 80px;">3. Confirm</span>
+              <div class="meter-track"><div id="mFillConfirm" class="meter-fill cnf" style="width: 53%;"></div></div>
+              <strong id="mTxtConfirm" style="width: 45px; text-align: right;">16/30</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- LEVEL 3: Execution Plan & Options Contract Intelligence -->
+        <div class="execution-section">
+          <div class="section-title">UNDERLYING EXECUTION PLAN</div>
+          <div class="exec-grid">
+            <div class="exec-card">
+              <div class="exec-label">Directional Entry</div>
+              <div id="planEntry" class="exec-val">--</div>
+            </div>
+            <div class="exec-card">
+              <div class="exec-label">Invalidation Stop</div>
+              <div id="planStop" class="exec-val stop">--</div>
+            </div>
+            <div class="exec-card">
+              <div class="exec-label">Target 1 (50%)</div>
+              <div id="planT1" class="exec-val target">--</div>
+            </div>
+            <div class="exec-card">
+              <div class="exec-label">Target 2 (R:R)</div>
+              <div id="planT2" class="exec-val target">--</div>
+            </div>
+          </div>
+
+          <!-- Options Contract Intelligence Box -->
+          <div id="optionsIntelBox" style="margin-top: 8px; background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 6px; padding: 8px 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+              <span style="font-size: 9.5px; font-weight: 800; color: #60a5fa; text-transform: uppercase; letter-spacing: 0.5px;">ESTIMATED OPTION SCENARIO</span>
+              <span id="optTypeBadge" style="font-size: 9px; font-weight: 800; background: rgba(16, 185, 129, 0.2); color: var(--call); padding: 1px 5px; border-radius: 3px;">0-1 DTE</span>
+            </div>
+            <div id="optContractTitle" style="font-size: 13px; font-weight: 900; color: #fff; margin-bottom: 4px;">SPX $5850 CALL</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; font-size: 10px; margin-bottom: 4px;">
+              <div style="background: #090e17; padding: 4px 6px; border-radius: 4px; border: 1px solid var(--panel-border);">
+                <div style="color: var(--text-muted); font-size: 8.5px;">EST. ENTRY</div>
+                <div id="optEstPremium" style="font-weight: 800; color: #fff;">--</div>
+              </div>
+              <div style="background: #090e17; padding: 4px 6px; border-radius: 4px; border: 1px solid var(--panel-border);">
+                <div style="color: var(--text-muted); font-size: 8.5px;">T1 TARGET</div>
+                <div id="optT1Target" style="font-weight: 800; color: var(--call);">--</div>
+              </div>
+              <div style="background: #090e17; padding: 4px 6px; border-radius: 4px; border: 1px solid var(--panel-border);">
+                <div style="color: var(--text-muted); font-size: 8.5px;">OPT STOP</div>
+                <div id="optStopTarget" style="font-weight: 800; color: var(--put);">--</div>
+              </div>
+            </div>
+            <div id="optContractNote" style="font-size: 9px; color: var(--text-muted); line-height: 1.25;">Cash-settled European style (No early exercise risk, Sec 1256 tax treatment).</div>
+          </div>
+        </div>
+
+        <!-- LEVEL 4: Evidence & Next Trigger Checklist -->
+        <div class="evidence-section">
+          <div class="section-title">TRIGGER CHECKLIST & THESIS</div>
+          <div id="triggerChecklist" class="trigger-checklist">
+            <div class="trigger-item">
+              <div class="trigger-status-icon met">✓</div>
+              <div class="trigger-details">
+                <div class="trigger-cond">Trend Alignment (EMA Stack)</div>
+                <div class="trigger-curr">EMA 9 >= 21 >= 50 confirmed</div>
+              </div>
+            </div>
+            <div class="trigger-item">
+              <div class="trigger-status-icon pending">⏳</div>
+              <div class="trigger-details">
+                <div class="trigger-cond">RVOL Volume Surge >= 1.25x</div>
+                <div class="trigger-curr">Current: 0.95x avg (Waiting for spike)</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- QQQ Tactical Macro View -->
+      <div id="qqqView" style="display: none; padding: 14px 16px;">
+        <div class="hero-badge qqq" style="margin-bottom: 8px;">
+          <span id="qqqStateTitle">STATE 1: FULL LONG</span>
+          <span id="qqqStateBadge" style="font-size: 11px;">100% TQQQ</span>
+        </div>
+        <div class="hero-status-sub" id="qqqActionText" style="margin-bottom: 12px;">
+          Maintain 100% Long TQQQ exposure. Macro momentum favorable.
+        </div>
+
+        <div style="background: #090e17; border: 1px solid var(--panel-border); border-radius: 6px; padding: 8px; margin-bottom: 12px;">
+          <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); margin-bottom: 6px; display: flex; justify-content: space-between;">
+            <span>Target Allocation</span>
+            <span id="qqqAllocSummary" style="color: #fff;">100% TQQQ</span>
+          </div>
+          <div style="height: 10px; background: #172030; border-radius: 4px; display: flex; overflow: hidden;">
+            <div id="barTqqq" style="width: 100%; background: var(--call);"></div>
+            <div id="barSqqq" style="width: 0%; background: var(--put);"></div>
+            <div id="barCash" style="width: 0%; background: var(--wait);"></div>
+            <div id="barIef" style="width: 0%; background: var(--purple);"></div>
+          </div>
+        </div>
+
+        <div class="exec-grid">
+          <div class="exec-card">
+            <div class="exec-label">SPY vs 200 SMA</div>
+            <div id="qqqSpyDist" class="exec-val" style="font-size: 11px;">--</div>
+          </div>
+          <div class="exec-card">
+            <div class="exec-label">TQQQ 10 RSI</div>
+            <div id="qqqTqqqRsi" class="exec-val" style="font-size: 11px;">--</div>
+          </div>
+          <div class="exec-card">
+            <div class="exec-label">S9 Bear Depth</div>
+            <div id="qqqS9Depth" class="exec-val" style="font-size: 11px;">--</div>
+          </div>
+          <div class="exec-card">
+            <div class="exec-label">2-Day Filter</div>
+            <div class="exec-val" style="font-size: 11px; color: var(--call);">Confirmed</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LEVEL 5: Collapsible Audit Trail -->
+      <div class="audit-section">
+        <div class="audit-header" onclick="toggleAuditDrawer()">
+          <span>📋 EVENT HISTORY (<span id="alertLogCount">0</span>)</span>
+          <span id="auditToggleIcon">▲</span>
+        </div>
+        <div id="auditDrawerBody" class="audit-body">
+          <div style="color: var(--text-dim); text-align: center; padding: 10px; font-size: 11px;">Scanning history...</div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <div style="display: flex; align-items: center; gap: 6px;">
+      <div style="width: 5px; height: 5px; background: var(--call); border-radius: 50%;"></div>
+      <span id="footerFeedStatus">Feed: Live (Yahoo Finance)</span>
+    </div>
+    <div>Normalized to <strong>US Eastern Time (America/New_York)</strong></div>
+  </footer>
+
+  <script>
+    const API_BASE = String(window.APP_CONFIG?.apiBaseUrl || "").replace(/\/$/, "");
+    let currentSymbol = "SPX";
+    let currentTimeframe = "15m";
+    let currentMode = "auto";
+    let chart = null;
+    let candleSeries = null;
+    let volumeSeries = null;
+    let ema9Series = null;
+    let ema21Series = null;
+    let ema50Series = null;
+    let trailingStopLine = null;
+    let auditDrawerOpen = true;
+
+    function initChart() {
+      const container = document.getElementById("chart-container");
+      container.innerHTML = "";
+
+      chart = LightweightCharts.createChart(container, {
+        layout: {
+          background: { color: "#070a10" },
+          textColor: "#8290a5",
+          fontSize: 11.5,
+          fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+        },
+        grid: {
+          vertLines: { color: "rgba(255, 255, 255, 0.02)" },
+          horzLines: { color: "rgba(255, 255, 255, 0.02)" },
+        },
+        crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+        rightPriceScale: { borderColor: "rgba(255, 255, 255, 0.06)", scaleMargins: { top: 0.08, bottom: 0.16 } },
+        localization: {
+          timeFormatter: (timestamp) => {
+            const date = new Date(timestamp * 1000);
+            return new Intl.DateTimeFormat('en-US', {
+              timeZone: 'America/New_York',
+              month: 'short',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: false
+            }).format(date) + ' EST';
+          },
+          dateFormat: 'yyyy-MM-dd',
+        },
+        timeScale: {
+          borderColor: "rgba(255, 255, 255, 0.06)",
+          timeVisible: true,
+          secondsVisible: false,
+          tickMarkFormatter: (time, tickMarkType, locale) => {
+            const date = new Date(time * 1000);
+            if (tickMarkType === 0) return new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year: 'numeric' }).format(date);
+            if (tickMarkType === 1) return new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', month: 'short' }).format(date);
+            if (tickMarkType === 2) return new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric' }).format(date);
+            return new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', hour12: false }).format(date);
+          }
+        },
+      });
+
+      candleSeries = chart.addCandlestickSeries({
+        upColor: "#10b981", downColor: "#ef4444", borderVisible: false, wickUpColor: "#10b981", wickDownColor: "#ef4444",
+      });
+
+      ema9Series = chart.addLineSeries({ color: "#3b82f6", lineWidth: 1, title: "EMA 9" });
+      ema21Series = chart.addLineSeries({ color: "#f59e0b", lineWidth: 1, title: "EMA 21" });
+      ema50Series = chart.addLineSeries({ color: "#8b5cf6", lineWidth: 1, title: "EMA 50" });
+
+      // Dropped volume bar height and opacity to a background baseline
+      volumeSeries = chart.addHistogramSeries({
+        priceFormat: { type: 'volume' },
+        priceScaleId: '',
+        scaleMargins: { top: 0.88, bottom: 0 },
+      });
+
+      window.addEventListener("resize", () => {
+        chart.applyOptions({ width: container.clientWidth, height: container.clientHeight });
+      });
+    }
+
+    async function fetchAnalysis() {
+      try {
+        if (!API_BASE && window.location.hostname.endsWith("github.io")) {
+          throw new Error("API URL is not configured. Set apiBaseUrl in config.js.");
+        }
+
+        const params = new URLSearchParams({
+          symbol: currentSymbol,
+          timeframe: currentTimeframe,
+          mode: currentMode,
+        });
+        const resp = await fetch(`${API_BASE}/api/analysis?${params}`);
+        const data = await resp.json();
+
+        if (!resp.ok) {
+          throw new Error(data.error || `API request failed (${resp.status})`);
+        }
+
+        if (!data.candles || data.candles.length === 0) return;
+
+        document.getElementById("hdrSymbol").innerText = data.symbol;
+        const last = data.candles[data.candles.length - 1];
+        const prev = data.candles.length > 1 ? data.candles[data.candles.length - 2] : last;
+        const diff = last.close - prev.close;
+        const pct = (diff / prev.close) * 100;
+
+        document.getElementById("hdrPrice").innerText = `$${last.close.toFixed(2)}`;
+        const chgEl = document.getElementById("hdrChange");
+        chgEl.innerText = `${diff >= 0 ? '+' : ''}${diff.toFixed(2)} (${diff >= 0 ? '+' : ''}${pct.toFixed(2)}%)`;
+        chgEl.className = `stock-change ${diff >= 0 ? 'up' : 'down'}`;
+
+        document.getElementById("footerFeedStatus").innerText = `Feed: ${data.source.toUpperCase()} (${data.symbol})`;
+
+        // Candles & Volume
+        const chartCandles = [];
+        const chartVols = [];
+        const seenTimes = new Set();
+
+        data.candles.forEach(c => {
+          if (!seenTimes.has(c.time)) {
+            seenTimes.add(c.time);
+            chartCandles.push({ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close });
+            chartVols.push({
+              time: c.time,
+              value: c.volume || 100,
+              color: c.close >= c.open ? "rgba(16, 185, 129, 0.12)" : "rgba(239, 68, 68, 0.12)"
+            });
+          }
+        });
+
+        chartCandles.sort((a, b) => a.time - b.time);
+        chartVols.sort((a, b) => a.time - b.time);
+        candleSeries.setData(chartCandles);
+        volumeSeries.setData(chartVols);
+
+        if (data.type === "macro_rotation" || currentSymbol === "QQQ") {
+          document.getElementById("equityView").style.display = "none";
+          document.getElementById("qqqView").style.display = "block";
+          updateQQQUI(data);
+        } else {
+          document.getElementById("equityView").style.display = "block";
+          document.getElementById("qqqView").style.display = "none";
+          updateEquityV5(data);
+        }
+
+        // Clean Directional Markers
+        const markers = [];
+        (data.alerts || []).forEach(a => {
+          const isCall = a.direction === "CALL";
+          if (a.state === "CONFIRMED" || a.type === "SIGNAL_CONFIRMED") {
+            markers.push({
+              time: a.time,
+              position: isCall ? "belowBar" : "aboveBar",
+              color: isCall ? "#10b981" : "#ef4444",
+              shape: isCall ? "arrowUp" : "arrowDown",
+              text: isCall ? "▲ CALL" : "▼ PUT",
+            });
+          } else if (a.type === "TARGET_1_HIT" || a.type === "TARGET_2_HIT") {
+            markers.push({
+              time: a.time,
+              position: isCall ? "belowBar" : "aboveBar",
+              color: "#f59e0b",
+              shape: "circle",
+              text: a.type === "TARGET_1_HIT" ? "🎯 T1" : "🎯 T2",
+            });
+          } else if (a.state === "EXIT" || a.type === "SIGNAL_EXIT") {
+            markers.push({
+              time: a.time,
+              position: isCall ? "aboveBar" : "belowBar",
+              color: "#94a3b8",
+              shape: "circle",
+              text: isCall ? "× CALL EXIT" : "× PUT EXIT",
+            });
+          } else if (a.type === "PORTFOLIO_ROTATION") {
+            markers.push({
+              time: a.time,
+              position: a.state === 1 ? "belowBar" : "aboveBar",
+              color: "#8b5cf6",
+              shape: "arrowUp",
+              text: `⚡ ROTATION`,
+            });
+          }
+        });
+        candleSeries.setMarkers(markers);
+
+      } catch (err) {
+        console.error("Error fetching analysis:", err);
+        document.getElementById("footerFeedStatus").innerText = `Feed error: ${err.message}`;
+        const actionText = document.getElementById("heroActionText");
+        const actionSub = document.getElementById("heroActionSub");
+        if (actionText && actionSub) {
+          actionText.innerText = "DATA UNAVAILABLE";
+          actionSub.innerText = err.message;
+        }
+      }
+    }
+
+    function updateEquityV5(data) {
+      const regime = data.regime || {};
+      const scoring = data.scoring || {};
+      const risk = data.risk || {};
+      const marketRisk = data.market_risk || {};
+      const setup = data.setup || {};
+      const activeSig = data.active_signal;
+      const exp = data.explainability?.explainability || {};
+      const triggers = data.explainability?.next_triggers || [];
+
+      const marketRiskBadge = document.getElementById("marketRiskBadge");
+      marketRiskBadge.style.display = "block";
+      marketRiskBadge.innerText = `RISK: ${marketRisk.risk_state || "NORMAL"}`;
+      marketRiskBadge.className = `regime-pill ${marketRisk.risk_state === "NORMAL" ? "up" : (marketRisk.risk_state === "EXTREME" ? "down" : "range")}`;
+
+      // Regime Badge
+      const regEl = document.getElementById("regimeBadge");
+      regEl.innerText = regime.regime || "RANGE";
+      regEl.className = "regime-pill " + (regime.regime === "TRENDING_UP" ? "up" : (regime.regime === "TRENDING_DOWN" ? "down" : "range"));
+
+      // LEVEL 1: Action / State Header
+      const actionBadge = document.getElementById("heroActionBadge");
+      const actionText = document.getElementById("heroActionText");
+      const actionSub = document.getElementById("heroActionSub");
+      const setupTag = document.getElementById("heroSetupTag");
+
+      setupTag.innerText = setup.setup_id || "NO_SETUP";
+
+      if (activeSig) {
+        if (activeSig.direction === "CALL") {
+          actionBadge.className = "hero-badge call";
+          actionText.innerText = "🟢 CALL ACTIVE";
+          actionSub.innerText = `Active CALL from $${activeSig.entry_price.toFixed(2)}. Invalidation at $${activeSig.trailing_stop.toFixed(2)}.`;
+        } else {
+          actionBadge.className = "hero-badge put";
+          actionText.innerText = "🔴 PUT ACTIVE";
+          actionSub.innerText = `Active PUT from $${activeSig.entry_price.toFixed(2)}. Invalidation at $${activeSig.trailing_stop.toFixed(2)}.`;
+        }
+      } else {
+        const score = scoring.signal_score || 0;
+        const dir = scoring.direction;
+        if (score >= 65 && dir !== "NEUTRAL") {
+          actionBadge.className = "hero-badge wait";
+          actionText.innerText = `🟡 WAIT / ${dir} WATCH`;
+          actionSub.innerText = `Potential ${dir} setup developing (${score}/100). Monitoring pending confirmation triggers.`;
+        } else {
+          actionBadge.className = "hero-badge none";
+          actionText.innerText = "⚪ NO TRADE / SCANNING";
+          actionSub.innerText = "No directional edge meets trade criteria. Preserving capital in neutral state.";
+        }
+      }
+
+      // LEVEL 2: Confidence / Score Tier
+      const score = Math.round(scoring.signal_score || 0);
+      document.getElementById("valSignalScore").innerText = score;
+      const tierBadge = document.getElementById("scoreTierBadge");
+
+      if (score >= 78) {
+        tierBadge.className = "score-tier-pill p1";
+        tierBadge.innerText = "P1 HIGH-CONFIDENCE";
+      } else if (score >= 68) {
+        tierBadge.className = "score-tier-pill p2";
+        tierBadge.innerText = "P2 STRONG ALERT";
+      } else if (score >= 50) {
+        tierBadge.className = "score-tier-pill watch";
+        tierBadge.innerText = "P3 WATCH ONLY";
+      } else {
+        tierBadge.className = "score-tier-pill none";
+        tierBadge.innerText = "NO TRADE";
+      }
+
+      // Single-Glance Horizontal Meters
+      const layers = scoring.layers || {};
+      const ctxVal = layers.context?.bull || layers.context?.bear || 0;
+      const stpVal = layers.setup?.bull || layers.setup?.bear || 0;
+      const cnfVal = layers.confirmation?.bull || layers.confirmation?.bear || 0;
+
+      document.getElementById("mFillContext").style.width = `${Math.min(100, (ctxVal / 35) * 100)}%`;
+      document.getElementById("mTxtContext").innerText = `${Math.round(ctxVal)}/35`;
+
+      document.getElementById("mFillSetup").style.width = `${Math.min(100, (stpVal / 35) * 100)}%`;
+      document.getElementById("mTxtSetup").innerText = `${Math.round(stpVal)}/35`;
+
+      document.getElementById("mFillConfirm").style.width = `${Math.min(100, (cnfVal / 30) * 100)}%`;
+      document.getElementById("mTxtConfirm").innerText = `${Math.round(cnfVal)}/30`;
+
+      // LEVEL 3: Execution Plan
+      const hasDirectionalPlan = ["CALL", "PUT"].includes(scoring.direction) && score >= 50;
+      document.getElementById("planEntry").innerText = hasDirectionalPlan && risk.entry_price ? `$${risk.entry_price.toFixed(2)}` : "--";
+      document.getElementById("planStop").innerText = hasDirectionalPlan && risk.stop_loss ? `$${risk.stop_loss.toFixed(2)}` : "--";
+      document.getElementById("planT1").innerText = hasDirectionalPlan && risk.target_1 ? `$${risk.target_1.toFixed(2)}` : "--";
+      document.getElementById("planT2").innerText = hasDirectionalPlan && risk.target_2 ? `$${risk.target_2.toFixed(2)} (${risk.rr_t2}:1)` : "--";
+
+      // Options Contract Intelligence
+      const opts = data.options || {};
+      const optBox = document.getElementById("optionsIntelBox");
+      if (optBox) {
+        if (opts.recommended_contract) {
+          optBox.style.display = "block";
+          document.getElementById("optContractTitle").innerText = opts.recommended_contract;
+          document.getElementById("optTypeBadge").innerText = opts.recommended_expiry || "0-1 DTE";
+          document.getElementById("optEstPremium").innerText = opts.estimated_premium || "--";
+          document.getElementById("optT1Target").innerText = opts.target_1_contract_target || "--";
+          document.getElementById("optStopTarget").innerText = opts.invalidation_contract_stop || "--";
+          document.getElementById("optContractNote").innerText = opts.contract_notes || "";
+        } else {
+          optBox.style.display = "none";
+        }
+      }
+
+      // LEVEL 4: Trigger Checklist
+      const checkContainer = document.getElementById("triggerChecklist");
+      if (triggers && triggers.length > 0) {
+        checkContainer.innerHTML = triggers.map(t => `
+          <div class="trigger-item">
+            <div class="trigger-status-icon ${t.status === 'MET' ? 'met' : 'pending'}">${t.status === 'MET' ? '✓' : '⏳'}</div>
+            <div class="trigger-details">
+              <div class="trigger-cond">${t.condition}</div>
+              <div class="trigger-curr">Current: ${t.current} (${t.status})</div>
+            </div>
+          </div>
+        `).join("");
+      } else {
+        checkContainer.innerHTML = `<div style="color:var(--text-muted);font-size:11px;">Awaiting setup formation...</div>`;
+      }
+
+      // Trailing Stop Line on Chart
+      if (chart) {
+        if (trailingStopLine) {
+          candleSeries.removePriceLine(trailingStopLine);
+          trailingStopLine = null;
+        }
+        if (activeSig && activeSig.trailing_stop) {
+          trailingStopLine = candleSeries.createPriceLine({
+            price: activeSig.trailing_stop,
+            color: '#f59e0b',
+            lineWidth: 2,
+            lineStyle: LightweightCharts.LineStyle.Dashed,
+            axisLabelVisible: true,
+            title: 'TRAIL STOP',
+          });
+        }
+      }
+
+      // LEVEL 5: Audit Trail
+      updateAuditLog(data.alerts || []);
+    }
+
+    function updateQQQUI(data) {
+      const macro = data.macro_regime || {};
+      const active = data.active_state || {};
+      const telem = data.macro_telemetry || {};
+
+      document.getElementById("qqqStateTitle").innerText = active.name || "STATE 1";
+      document.getElementById("qqqStateBadge").innerText = active.badge || "--";
+      document.getElementById("qqqActionText").innerText = active.action || "--";
+
+      const regimeBadge = document.getElementById("regimeBadge");
+      regimeBadge.innerText = macro.regime || "MACRO";
+      regimeBadge.className = `regime-pill ${macro.regime === "BULL MARKET" ? "up" : "down"}`;
+      document.getElementById("marketRiskBadge").style.display = "none";
+
+      const alloc = active.allocation || { TQQQ: 100, SQQQ: 0, Cash: 0, IEF: 0 };
+      document.getElementById("barTqqq").style.width = `${alloc.TQQQ || 0}%`;
+      document.getElementById("barSqqq").style.width = `${alloc.SQQQ || 0}%`;
+      document.getElementById("barCash").style.width = `${alloc.Cash || 0}%`;
+      document.getElementById("barIef").style.width = `${alloc.IEF || 0}%`;
+      document.getElementById("qqqAllocSummary").innerText = active.badge || "--";
+
+      document.getElementById("qqqSpyDist").innerText = `${macro.dist_to_sma200_pct}%`;
+      document.getElementById("qqqTqqqRsi").innerText = telem.tqqq_rsi10;
+      document.getElementById("qqqS9Depth").innerText = `${telem.s9_bear_depth_pct}% SQQQ`;
+
+      updateAuditLog(data.alerts || []);
+    }
+
+    function updateAuditLog(alerts) {
+      document.getElementById("alertLogCount").innerText = alerts.length;
+      const body = document.getElementById("auditDrawerBody");
+
+      if (!alerts || alerts.length === 0) {
+        body.innerHTML = `<div style="color: var(--text-dim); text-align: center; padding: 10px; font-size: 11px;">No historical events recorded.</div>`;
+        return;
+      }
+
+      const rev = [...alerts].reverse().slice(0, 15);
+      body.innerHTML = rev.map(a => {
+        const isCall = a.direction === "CALL";
+        const isExit = a.state === "EXIT" || a.type === "SIGNAL_EXIT";
+        const isRot = a.type === "PORTFOLIO_ROTATION";
+        const rowClass = isRot ? "rot" : (isExit ? "exit" : (isCall ? "call" : "put"));
+
+        const date = new Date(a.time * 1000);
+        const timeStr = new Intl.DateTimeFormat('en-US', {
+          timeZone: 'America/New_York',
+          hour: '2-digit', minute: '2-digit', hour12: false
+        }).format(date);
+
+        return `
+          <div class="audit-row ${rowClass}">
+            <span style="font-weight: 700; color: #fff;">${a.title}</span>
+            <span style="color: var(--text-muted);">${timeStr} ET</span>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function toggleAuditDrawer() {
+      const body = document.getElementById("auditDrawerBody");
+      const icon = document.getElementById("auditToggleIcon");
+      auditDrawerOpen = !auditDrawerOpen;
+      if (auditDrawerOpen) {
+        body.style.display = "flex";
+        icon.innerText = "▲";
+      } else {
+        body.style.display = "none";
+        icon.innerText = "▼";
+      }
+    }
+
+    function selectSymbol(sym, btn) {
+      currentSymbol = sym;
+      document.querySelectorAll(".sym-tab").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      const timeframeButtons = document.querySelectorAll(".tf-btn");
+      timeframeButtons.forEach(b => { b.disabled = sym === "QQQ"; });
+      if (sym === "QQQ") {
+        currentTimeframe = "1d";
+        timeframeButtons.forEach(b => b.classList.toggle("active", b.innerText === "1D"));
+      }
+      fetchAnalysis();
+    }
+
+    function setTimeframe(tf, btn) {
+      currentTimeframe = tf;
+      document.querySelectorAll(".tf-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      fetchAnalysis();
+    }
+
+    function toggleMode() {
+      const modeBtn = document.getElementById("modeBtn");
+      const modeIcon = document.getElementById("modeIcon");
+      const modeText = document.getElementById("modeText");
+
+      if (currentMode === "auto" || currentMode === "live") {
+        currentMode = "simulate";
+        modeBtn.classList.add("active");
+        modeIcon.innerText = "⚡";
+        modeText.innerText = "Simulate";
+      } else {
+        currentMode = "auto";
+        modeBtn.classList.remove("active");
+        modeIcon.innerText = "🔴";
+        modeText.innerText = "Live";
+      }
+      fetchAnalysis();
+    }
+
+    function updateClock() {
+      const el = document.getElementById("liveClock");
+      if (el) {
+        const now = new Date();
+        const str = new Intl.DateTimeFormat('en-US', {
+          timeZone: 'America/New_York',
+          hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+        }).format(now);
+        el.innerText = `${str} ET`;
+      }
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      initChart();
+      updateClock();
+      setInterval(updateClock, 1000);
+      fetchAnalysis();
+      setInterval(fetchAnalysis, 5000);
+    });
+  </script>
+</body>
+</html>

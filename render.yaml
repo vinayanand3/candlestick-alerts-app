@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: candlestick-alerts-api
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.11
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: MARKET_DATA_CACHE_SECONDS
+        value: 60
