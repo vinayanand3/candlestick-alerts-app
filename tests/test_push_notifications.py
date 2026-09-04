@@ -4,12 +4,20 @@ from datetime import datetime
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec
 from fastapi import HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
+from py_vapid import Vapid
 from pydantic import ValidationError
 
 import app
-from push_notifications import InvalidPushEndpoint, event_id, validate_push_subscription
+from push_notifications import (
+    InvalidPushEndpoint,
+    _vapid_private_key,
+    event_id,
+    validate_push_subscription,
+)
 
 
 VALID_SUBSCRIPTION = {
@@ -23,6 +31,19 @@ VALID_SUBSCRIPTION = {
 
 
 class TestPushSecurity(unittest.TestCase):
+    def test_pem_vapid_private_key_is_parsed_before_delivery(self):
+        private_key = ec.generate_private_key(ec.SECP256R1())
+        private_pem = private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        ).decode("ascii")
+
+        with patch.dict(os.environ, {"VAPID_PRIVATE_KEY": private_pem}, clear=False):
+            parsed = _vapid_private_key()
+
+        self.assertIsInstance(parsed, Vapid)
+
     def test_rejects_arbitrary_push_endpoint(self):
         subscription = {
             **VALID_SUBSCRIPTION,

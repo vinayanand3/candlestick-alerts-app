@@ -16,6 +16,7 @@ from urllib.parse import urlparse
 
 from google.cloud import firestore
 from google.oauth2 import service_account
+from py_vapid import Vapid
 from pywebpush import WebPushException, webpush
 
 
@@ -188,6 +189,19 @@ def _vapid_claims() -> Dict[str, str]:
     return {"sub": contact}
 
 
+def _vapid_private_key():
+    private_key = os.getenv("VAPID_PRIVATE_KEY", "").replace("\\n", "\n").strip()
+    if not private_key:
+        raise PushConfigurationError("VAPID_PRIVATE_KEY is not configured.")
+
+    if private_key.startswith("-----BEGIN"):
+        try:
+            return Vapid.from_pem(private_key.encode("utf-8"))
+        except (TypeError, ValueError) as exc:
+            raise PushConfigurationError("VAPID_PRIVATE_KEY is invalid.") from exc
+    return private_key
+
+
 def send_web_push(subscription: Dict[str, Any], payload: Dict[str, Any]) -> Tuple[bool, bool]:
     """Send one push message.
 
@@ -195,9 +209,7 @@ def send_web_push(subscription: Dict[str, Any], payload: Dict[str, Any]) -> Tupl
     capability URLs are never logged here.
     """
     validate_push_subscription(subscription)
-    private_key = os.getenv("VAPID_PRIVATE_KEY", "").replace("\\n", "\n")
-    if not private_key:
-        raise PushConfigurationError("VAPID_PRIVATE_KEY is not configured.")
+    private_key = _vapid_private_key()
 
     try:
         webpush(
