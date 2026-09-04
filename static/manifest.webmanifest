@@ -1,0 +1,11 @@
+{
+  "id": "/candlestick-alerts-app/",
+  "name": "Candlestick Trading Alerts",
+  "short_name": "Candle Alerts",
+  "description": "Browser notifications for high-conviction candlestick trading alerts.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#070a10",
+  "theme_color": "#0e141f"
+}

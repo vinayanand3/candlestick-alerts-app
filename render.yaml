@@ -10,5 +10,27 @@ services:
         value: 3.11.11
       - key: ALLOWED_ORIGINS
         sync: false
+      - key: ALLOWED_HOSTS
+        value: localhost,127.0.0.1,*.onrender.com
       - key: MARKET_DATA_CACHE_SECONDS
         value: 60
+      - key: DASHBOARD_URL
+        value: https://vinayanand3.github.io/candlestick-alerts-app/
+      - key: SCAN_SYMBOLS
+        value: SPX,NDX,TSLA,AAPL,NVDA,META,QQQ
+      - key: SCAN_TIMEFRAME
+        value: 15m
+      - key: FIRESTORE_COLLECTION_PREFIX
+        value: candlestick_alerts
+      - key: FIREBASE_SERVICE_ACCOUNT_JSON
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_CONTACT_EMAIL
+        sync: false
+      - key: SUBSCRIPTION_ACCESS_TOKEN
+        sync: false
+      - key: SCAN_TOKEN
+        sync: false

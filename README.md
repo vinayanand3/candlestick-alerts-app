@@ -104,6 +104,81 @@ The API health check is available at `/api/health`.
 4. In the repository settings, open Pages and choose GitHub Actions as the source.
 5. The workflow in `.github/workflows/pages.yml` publishes the `static` directory.
 
+## Browser push alerts
+
+The dashboard can subscribe a browser to Web Push notifications. A scheduled
+GitHub Actions workflow calls the Render API, the API scans the configured
+symbols, and Firestore stores subscriptions plus alert-deduplication records.
+The browser does not need to remain open after it has subscribed.
+
+### 1. Create the Firebase storage
+
+1. Create a Firebase project and enable Cloud Firestore in Native mode using
+   production rules, not test mode.
+2. Create a dedicated service account with the Cloud Datastore User role. Avoid
+   broad Owner or Editor roles. Download its JSON key once and never commit it.
+3. In the Firebase console, open **Firestore Database > Rules**, paste the
+   included `firestore.rules`, and publish it. This denies all direct browser
+   access. The API uses IAM-authenticated server access instead.
+
+### 2. Generate Web Push keys and access tokens
+
+Run the following locally. The VAPID generator prints the private key only to
+your terminal and does not save it to disk.
+
+```bash
+python scripts/generate_vapid_keys.py
+python -c 'import secrets; print(secrets.token_urlsafe(32))'
+python -c 'import secrets; print(secrets.token_urlsafe(32))'
+```
+
+Use one random value as `SUBSCRIPTION_ACCESS_TOKEN` and the other as
+`SCAN_TOKEN`. Keep both in a password manager.
+
+### 3. Configure Render
+
+Add these environment variables to the existing Render Web Service:
+
+| Key | Value |
+| --- | --- |
+| `ALLOWED_ORIGINS` | `https://vinayanand3.github.io` |
+| `ALLOWED_HOSTS` | `*.onrender.com` |
+| `DASHBOARD_URL` | `https://vinayanand3.github.io/candlestick-alerts-app/` |
+| `FIREBASE_SERVICE_ACCOUNT_JSON` | The complete service-account JSON document |
+| `VAPID_PRIVATE_KEY` | The complete generated PEM private key |
+| `VAPID_PUBLIC_KEY` | The generated public key |
+| `VAPID_CONTACT_EMAIL` | Your contact email address |
+| `SUBSCRIPTION_ACCESS_TOKEN` | The first generated random value |
+| `SCAN_TOKEN` | The second generated random value |
+
+Also set `SCAN_SYMBOLS` and `SCAN_TIMEFRAME` if you want values other than the
+defaults. Render automatically redeploys after the environment is saved.
+
+### 4. Configure GitHub Actions
+
+In the repository, open **Settings > Secrets and variables > Actions** and add
+a repository secret named `SCAN_TOKEN` with the exact same value used on
+Render. The `scan-alerts.yml` workflow runs every ten minutes on weekdays. The
+API independently enforces the US Eastern market window and suppresses duplicate
+notifications.
+
+The private-repository schedule uses at most roughly 1,380 Actions minutes in a
+23-weekday month. That is below the standard 2,000-minute GitHub Free allowance,
+but it leaves less capacity for other workflows. Standard GitHub-hosted runners
+are not billed by the minute for public repositories.
+
+### 5. Subscribe a browser
+
+Open the GitHub Pages dashboard, select **Alerts Off**, approve notification
+permission, and enter `SUBSCRIPTION_ACCESS_TOKEN` when prompted. The token stays
+in memory for the current page only and is not stored in browser storage. The
+app sends a test notification after a successful subscription.
+
+Web Push requires HTTPS and user permission. Private browsing modes, operating
+system notification settings, and browser-specific background restrictions can
+still prevent delivery. Render's free service can sleep when idle, so the first
+scheduled request may take longer while it wakes.
+
 ## Data and risk notes
 
 - Live mode reports an error when Yahoo Finance is unavailable. It never silently substitutes simulated prices.

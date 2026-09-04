@@ -1,0 +1,50 @@
+name: Scan markets and send browser alerts
+
+on:
+  schedule:
+    # Runs away from the top of the hour to reduce GitHub scheduler congestion.
+    # The API performs the authoritative US Eastern market-hours check.
+    - cron: "7,17,27,37,47,57 13-22 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Run outside the normal market scan window
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: market-alert-scanner
+  cancel-in-progress: true
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Trigger authenticated market scan
+        env:
+          SCAN_TOKEN: ${{ secrets.SCAN_TOKEN }}
+          FORCE_SCAN: ${{ inputs.force || 'false' }}
+        run: |
+          if [ -z "$SCAN_TOKEN" ]; then
+            echo "::notice::SCAN_TOKEN is not configured; market scan skipped."
+            exit 0
+          fi
+          force_query=""
+          if [ "$FORCE_SCAN" = "true" ]; then
+            force_query="?force=true"
+          fi
+          curl \
+            --fail-with-body \
+            --show-error \
+            --silent \
+            --max-time 120 \
+            --retry 2 \
+            --retry-all-errors \
+            --request POST \
+            --header "Authorization: Bearer $SCAN_TOKEN" \
+            "https://candlestick-alerts-app.onrender.com/api/scan${force_query}"

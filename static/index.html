@@ -3,9 +3,19 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0e141f" />
+  <meta
+    http-equiv="Content-Security-Policy"
+    content="default-src 'self'; script-src 'self' https://unpkg.com 'sha256-Tadf5hkfTVuJrXKPbEanAwr2b/bpuL8Yhdc0R91sB34='; style-src 'self' 'unsafe-inline'; connect-src 'self' https://candlestick-alerts-app.onrender.com; img-src 'self' data:; font-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; upgrade-insecure-requests"
+  />
   <title>V5 Institutional Command Center | TSLA • AAPL • NVDA • META • QQQ</title>
   <link rel="icon" href="data:," />
-  <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <script
+    src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"
+    integrity="sha384-JZigAjwiaZtkUbA44CWkPaT3iBb/mU5pO6QOANp+OqHd4q+1+7MG1kzp2OOP9ZfP"
+    crossorigin="anonymous"
+  ></script>
   <script src="./config.js"></script>
   <style>
     :root {
@@ -93,6 +103,8 @@
       padding: 4px 9px; border-radius: 5px; font-size: 11.5px; cursor: pointer;
     }
     .btn-toggle.active { border-color: var(--accent); color: #60a5fa; }
+    .btn-toggle.notifications-on { border-color: var(--call-border); color: var(--call); }
+    .btn-toggle:disabled { cursor: wait; opacity: 0.65; }
 
     /* Main Grid: 75% Chart / 25% Command Center */
     .main-layout {
@@ -374,31 +386,33 @@
     </div>
 
     <div class="symbol-tabs">
-      <button class="sym-tab active" onclick="selectSymbol('SPX', this)">🏛️ SPX Options</button>
-      <button class="sym-tab" onclick="selectSymbol('NDX', this)">📊 NDX Options</button>
-      <button class="sym-tab" onclick="selectSymbol('TSLA', this)">TSLA</button>
-      <button class="sym-tab" onclick="selectSymbol('AAPL', this)">AAPL</button>
-      <button class="sym-tab" onclick="selectSymbol('NVDA', this)">NVDA</button>
-      <button class="sym-tab" onclick="selectSymbol('META', this)">META</button>
-      <button class="sym-tab qqq-tab" onclick="selectSymbol('QQQ', this)">⚡ QQQ Tactical</button>
+      <button class="sym-tab active" data-symbol="SPX">🏛️ SPX Options</button>
+      <button class="sym-tab" data-symbol="NDX">📊 NDX Options</button>
+      <button class="sym-tab" data-symbol="TSLA">TSLA</button>
+      <button class="sym-tab" data-symbol="AAPL">AAPL</button>
+      <button class="sym-tab" data-symbol="NVDA">NVDA</button>
+      <button class="sym-tab" data-symbol="META">META</button>
+      <button class="sym-tab qqq-tab" data-symbol="QQQ">⚡ QQQ Tactical</button>
     </div>
 
     <div class="controls-right">
       <div id="liveClock" class="clock-pill">--:--:-- ET</div>
 
       <div class="tf-group">
-        <button class="tf-btn" onclick="setTimeframe('1m', this)">1m</button>
-        <button class="tf-btn" onclick="setTimeframe('5m', this)">5m</button>
-        <button class="tf-btn active" onclick="setTimeframe('15m', this)">15m</button>
-        <button class="tf-btn" onclick="setTimeframe('1h', this)">1h</button>
-        <button class="tf-btn" onclick="setTimeframe('1d', this)">1D</button>
+        <button class="tf-btn" data-timeframe="1m">1m</button>
+        <button class="tf-btn" data-timeframe="5m">5m</button>
+        <button class="tf-btn active" data-timeframe="15m">15m</button>
+        <button class="tf-btn" data-timeframe="1h">1h</button>
+        <button class="tf-btn" data-timeframe="1d">1D</button>
       </div>
 
-      <button id="modeBtn" class="btn-toggle" onclick="toggleMode()">
+      <button id="notificationBtn" class="btn-toggle" title="Enable browser notifications">🔔 Alerts Off</button>
+
+      <button id="modeBtn" class="btn-toggle">
         <span id="modeIcon">🔴</span> <span id="modeText">Live</span>
       </button>
 
-      <button class="btn-toggle" onclick="fetchAnalysis()" title="Refresh">↻</button>
+      <button id="refreshBtn" class="btn-toggle" title="Refresh">↻</button>
     </div>
   </header>
 
@@ -568,7 +582,7 @@
 
       <!-- LEVEL 5: Collapsible Audit Trail -->
       <div class="audit-section">
-        <div class="audit-header" onclick="toggleAuditDrawer()">
+        <div id="auditHeader" class="audit-header" role="button" tabindex="0">
           <span>📋 EVENT HISTORY (<span id="alertLogCount">0</span>)</span>
           <span id="auditToggleIcon">▲</span>
         </div>
@@ -591,8 +605,22 @@
   </footer>
 
   <script>
-    const API_BASE = String(window.APP_CONFIG?.apiBaseUrl || "").replace(/\/$/, "");
-    let currentSymbol = "SPX";
+    const SUPPORTED_SYMBOLS = new Set(["SPX", "NDX", "TSLA", "AAPL", "NVDA", "META", "QQQ"]);
+
+    function resolveApiBase() {
+      const configured = String(globalThis.APP_CONFIG?.apiBaseUrl || "").replace(/\/$/, "");
+      if (!configured) return "";
+      const parsed = new URL(configured);
+      const isLocal = parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1";
+      if (parsed.protocol !== "https:" && !(isLocal && parsed.protocol === "http:")) {
+        throw new Error("The configured API URL must use HTTPS.");
+      }
+      return parsed.origin;
+    }
+
+    const API_BASE = resolveApiBase();
+    const requestedSymbol = new URLSearchParams(globalThis.location.search).get("symbol")?.toUpperCase();
+    let currentSymbol = SUPPORTED_SYMBOLS.has(requestedSymbol) ? requestedSymbol : "SPX";
     let currentTimeframe = "15m";
     let currentMode = "auto";
     let chart = null;
@@ -604,9 +632,143 @@
     let trailingStopLine = null;
     let auditDrawerOpen = true;
 
+    function setNotificationButton(enabled, label) {
+      const button = document.getElementById("notificationBtn");
+      button.classList.toggle("notifications-on", enabled);
+      button.textContent = label || (enabled ? "🔔 Alerts On" : "🔔 Alerts Off");
+      button.title = enabled ? "Disable browser notifications" : "Enable browser notifications";
+    }
+
+    function base64UrlToUint8Array(value) {
+      const padding = "=".repeat((4 - (value.length % 4)) % 4);
+      const normalized = (value + padding).replace(/-/g, "+").replace(/_/g, "/");
+      const raw = globalThis.atob(normalized);
+      return Uint8Array.from([...raw].map(character => character.charCodeAt(0)));
+    }
+
+    async function pushApiRequest(path, options = {}) {
+      const response = await fetch(`${API_BASE}${path}`, options);
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.detail || data.error || `Notification request failed (${response.status})`);
+      }
+      return data;
+    }
+
+    function requestSubscriptionCode() {
+      const token = globalThis.prompt("Enter your private notification subscription code. It is used once and is not stored by the dashboard.");
+      if (!token || token.length > 512) {
+        throw new Error("A valid subscription code is required.");
+      }
+      return token;
+    }
+
+    async function getServiceWorkerRegistration() {
+      if (!("serviceWorker" in navigator) || !("PushManager" in globalThis)) {
+        throw new Error("This browser does not support Web Push notifications.");
+      }
+      return navigator.serviceWorker.register("./sw.js", { scope: "./" });
+    }
+
+    async function enableNotifications() {
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        throw new Error("Notification permission was not granted.");
+      }
+
+      const config = await pushApiRequest("/api/push/config");
+      if (!config.configured || !config.public_key) {
+        throw new Error(`Server notification setup is incomplete: ${(config.missing_settings || []).join(", ")}`);
+      }
+
+      const registration = await getServiceWorkerRegistration();
+      let subscription = await registration.pushManager.getSubscription();
+      if (!subscription) {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: base64UrlToUint8Array(config.public_key),
+        });
+      }
+
+      const accessToken = requestSubscriptionCode();
+      const requestBody = {
+        subscription: subscription.toJSON(),
+        preferences: {
+          symbols: [...SUPPORTED_SYMBOLS],
+          min_score: 68,
+        },
+      };
+      const headers = {
+        "Authorization": `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      };
+      await pushApiRequest("/api/push/subscriptions", {
+        method: "POST",
+        headers,
+        body: JSON.stringify(requestBody),
+      });
+      await pushApiRequest("/api/push/test", {
+        method: "POST",
+        headers,
+        body: JSON.stringify(requestBody),
+      });
+      setNotificationButton(true);
+    }
+
+    async function disableNotifications() {
+      const registration = await getServiceWorkerRegistration();
+      const subscription = await registration.pushManager.getSubscription();
+      if (!subscription) {
+        setNotificationButton(false);
+        return;
+      }
+
+      const accessToken = requestSubscriptionCode();
+      await pushApiRequest("/api/push/subscriptions", {
+        method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ endpoint: subscription.endpoint }),
+      });
+      await subscription.unsubscribe();
+      setNotificationButton(false);
+    }
+
+    async function toggleNotifications() {
+      const button = document.getElementById("notificationBtn");
+      button.disabled = true;
+      try {
+        const registration = await getServiceWorkerRegistration();
+        const subscription = await registration.pushManager.getSubscription();
+        if (subscription) {
+          await disableNotifications();
+        } else {
+          await enableNotifications();
+        }
+      } catch (error) {
+        console.error("Notification setup failed:", error);
+        globalThis.alert(error.message);
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    async function refreshNotificationStatus() {
+      if (!("serviceWorker" in navigator) || !("PushManager" in globalThis) || !("Notification" in globalThis)) {
+        setNotificationButton(false, "🔕 Unsupported");
+        document.getElementById("notificationBtn").disabled = true;
+        return;
+      }
+      const registration = await getServiceWorkerRegistration();
+      const subscription = await registration.pushManager.getSubscription();
+      setNotificationButton(Boolean(subscription));
+    }
+
     function initChart() {
       const container = document.getElementById("chart-container");
-      container.innerHTML = "";
+      container.replaceChildren();
 
       chart = LightweightCharts.createChart(container, {
         layout: {
@@ -859,9 +1021,16 @@
 
       // Single-Glance Horizontal Meters
       const layers = scoring.layers || {};
-      const ctxVal = layers.context?.bull || layers.context?.bear || 0;
-      const stpVal = layers.setup?.bull || layers.setup?.bear || 0;
-      const cnfVal = layers.confirmation?.bull || layers.confirmation?.bear || 0;
+      const layerSide = scoring.direction === "PUT"
+        ? "bear"
+        : scoring.direction === "CALL"
+          ? "bull"
+          : Number(scoring.bear_score || 0) > Number(scoring.bull_score || 0)
+            ? "bear"
+            : "bull";
+      const ctxVal = Number(layers.context?.[layerSide] ?? 0);
+      const stpVal = Number(layers.setup?.[layerSide] ?? 0);
+      const cnfVal = Number(layers.confirmation?.[layerSide] ?? 0);
 
       document.getElementById("mFillContext").style.width = `${Math.min(100, (ctxVal / 35) * 100)}%`;
       document.getElementById("mTxtContext").innerText = `${Math.round(ctxVal)}/35`;
@@ -898,18 +1067,36 @@
 
       // LEVEL 4: Trigger Checklist
       const checkContainer = document.getElementById("triggerChecklist");
+      checkContainer.replaceChildren();
       if (triggers && triggers.length > 0) {
-        checkContainer.innerHTML = triggers.map(t => `
-          <div class="trigger-item">
-            <div class="trigger-status-icon ${t.status === 'MET' ? 'met' : 'pending'}">${t.status === 'MET' ? '✓' : '⏳'}</div>
-            <div class="trigger-details">
-              <div class="trigger-cond">${t.condition}</div>
-              <div class="trigger-curr">Current: ${t.current} (${t.status})</div>
-            </div>
-          </div>
-        `).join("");
+        triggers.forEach(trigger => {
+          const isMet = trigger.status === "MET";
+          const item = document.createElement("div");
+          item.className = "trigger-item";
+
+          const statusIcon = document.createElement("div");
+          statusIcon.className = `trigger-status-icon ${isMet ? "met" : "pending"}`;
+          statusIcon.textContent = isMet ? "✓" : "⏳";
+
+          const details = document.createElement("div");
+          details.className = "trigger-details";
+          const condition = document.createElement("div");
+          condition.className = "trigger-cond";
+          condition.textContent = String(trigger.condition || "");
+          const current = document.createElement("div");
+          current.className = "trigger-curr";
+          current.textContent = `Current: ${String(trigger.current || "")} (${String(trigger.status || "PENDING")})`;
+
+          details.append(condition, current);
+          item.append(statusIcon, details);
+          checkContainer.appendChild(item);
+        });
       } else {
-        checkContainer.innerHTML = `<div style="color:var(--text-muted);font-size:11px;">Awaiting setup formation...</div>`;
+        const waiting = document.createElement("div");
+        waiting.style.color = "var(--text-muted)";
+        waiting.style.fontSize = "11px";
+        waiting.textContent = "Awaiting setup formation...";
+        checkContainer.appendChild(waiting);
       }
 
       // Trailing Stop Line on Chart
@@ -965,32 +1152,44 @@
     function updateAuditLog(alerts) {
       document.getElementById("alertLogCount").innerText = alerts.length;
       const body = document.getElementById("auditDrawerBody");
+      body.replaceChildren();
 
       if (!alerts || alerts.length === 0) {
-        body.innerHTML = `<div style="color: var(--text-dim); text-align: center; padding: 10px; font-size: 11px;">No historical events recorded.</div>`;
+        const empty = document.createElement("div");
+        empty.style.color = "var(--text-dim)";
+        empty.style.textAlign = "center";
+        empty.style.padding = "10px";
+        empty.style.fontSize = "11px";
+        empty.textContent = "No historical events recorded.";
+        body.appendChild(empty);
         return;
       }
 
       const rev = [...alerts].reverse().slice(0, 15);
-      body.innerHTML = rev.map(a => {
-        const isCall = a.direction === "CALL";
-        const isExit = a.state === "EXIT" || a.type === "SIGNAL_EXIT";
-        const isRot = a.type === "PORTFOLIO_ROTATION";
+      rev.forEach(alertItem => {
+        const isCall = alertItem.direction === "CALL";
+        const isExit = alertItem.state === "EXIT" || alertItem.type === "SIGNAL_EXIT";
+        const isRot = alertItem.type === "PORTFOLIO_ROTATION";
         const rowClass = isRot ? "rot" : (isExit ? "exit" : (isCall ? "call" : "put"));
 
-        const date = new Date(a.time * 1000);
+        const date = new Date(Number(alertItem.time) * 1000);
         const timeStr = new Intl.DateTimeFormat('en-US', {
           timeZone: 'America/New_York',
           hour: '2-digit', minute: '2-digit', hour12: false
         }).format(date);
 
-        return `
-          <div class="audit-row ${rowClass}">
-            <span style="font-weight: 700; color: #fff;">${a.title}</span>
-            <span style="color: var(--text-muted);">${timeStr} ET</span>
-          </div>
-        `;
-      }).join("");
+        const row = document.createElement("div");
+        row.className = `audit-row ${rowClass}`;
+        const title = document.createElement("span");
+        title.style.fontWeight = "700";
+        title.style.color = "#fff";
+        title.textContent = String(alertItem.title || "Trading alert");
+        const eventTime = document.createElement("span");
+        eventTime.style.color = "var(--text-muted)";
+        eventTime.textContent = `${timeStr} ET`;
+        row.append(title, eventTime);
+        body.appendChild(row);
+      });
     }
 
     function toggleAuditDrawer() {
@@ -1058,10 +1257,31 @@
     }
 
     window.addEventListener("DOMContentLoaded", () => {
+      document.querySelectorAll(".sym-tab").forEach(button => {
+        button.addEventListener("click", () => selectSymbol(button.dataset.symbol, button));
+        button.classList.toggle("active", button.dataset.symbol === currentSymbol);
+      });
+      document.querySelectorAll(".tf-btn").forEach(button => {
+        button.addEventListener("click", () => setTimeframe(button.dataset.timeframe, button));
+      });
+      document.getElementById("modeBtn").addEventListener("click", toggleMode);
+      document.getElementById("refreshBtn").addEventListener("click", fetchAnalysis);
+      document.getElementById("notificationBtn").addEventListener("click", toggleNotifications);
+      document.getElementById("auditHeader").addEventListener("click", toggleAuditDrawer);
+      document.getElementById("auditHeader").addEventListener("keydown", event => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          toggleAuditDrawer();
+        }
+      });
+
       initChart();
+      const selectedSymbolButton = document.querySelector(`.sym-tab[data-symbol="${currentSymbol}"]`);
+      if (selectedSymbolButton) selectSymbol(currentSymbol, selectedSymbolButton);
       updateClock();
       setInterval(updateClock, 1000);
-      fetchAnalysis();
+      refreshNotificationStatus().catch(error => console.warn("Notification status unavailable:", error));
+      if (!selectedSymbolButton) fetchAnalysis();
       setInterval(fetchAnalysis, 5000);
     });
   </script>
