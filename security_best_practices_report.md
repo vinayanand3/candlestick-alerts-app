@@ -1,6 +1,6 @@
 # Security review for public repository readiness
 
-Review date: 2026-09-02
+Review date: 2026-09-04
 
 Scope: the current working tree, all reachable Git history, the FastAPI backend,
 the GitHub Pages frontend, the Web Push implementation, dependencies, and the
@@ -10,12 +10,9 @@ scheduled GitHub Actions scanner.
 
 No critical or high-severity unresolved security issue was found. No credential,
 private key, environment file, or recognizable provider token was found in the
-current tree or reachable Git history. The repository is suitable to make public
-after the deployment-only secrets listed in the README are created in Render and
-GitHub, and only if those values remain outside Git.
-
-The repository is still private at the time of this review. Changing visibility
-was intentionally left as a separate, explicit owner action.
+current tree or any of the 62 reachable historical blobs. The required
+deployment-only secrets are configured in Render and GitHub and remain outside
+Git. The repository is suitable for public visibility.
 
 ## Resolved findings
 
@@ -71,12 +68,20 @@ Firestore through a server service account. `firestore.rules` denies all direct
 client access. Subscription documents use SHA-256 identifiers instead of raw
 endpoint capability URLs as document names.
 
+### Low: in-memory PEM VAPID keys needed explicit parsing
+
+Resolution: `push_notifications.py` around lines 192 through 219 explicitly
+parses PEM-formatted VAPID keys before passing them to the Web Push library.
+Malformed keys fail as configuration errors instead of being treated as encoded
+DER strings. A regression test covers the PEM path.
+
 ## Verification performed
 
-- Searched current files and reachable Git history for common credentials,
-  provider tokens, private keys, and secret-file extensions. No match was found.
+- Searched the current tree and all 62 reachable historical blobs for common
+  credentials, provider tokens, private keys, sensitive environment assignments,
+  and secret-file extensions. No match was found.
 - Ran `pip-audit` against `requirements.txt`. No known vulnerability was found.
-- Ran both unittest suites. All 41 tests passed.
+- Ran both unittest suites. All 42 tests passed.
 - Ran Python bytecode compilation and `pip check`. Both passed.
 - Loaded the dashboard in Chromium with Playwright. The page rendered, the new
   alert control was present, the Content Security Policy allowed the intended
@@ -84,6 +89,10 @@ endpoint capability URLs as document names.
 - Exercised the protected endpoints through a running Uvicorn server. Missing and
   incorrect tokens returned 401; correct test tokens reached the protected
   handler and failed closed because Firebase production credentials were absent.
+- Verified the live Render service accepted the protected subscription token and
+  delivered a Web Push test notification.
+- Verified the GitHub Actions `SCAN_TOKEN` is present as a repository secret and
+  is referenced only through the workflow secret context.
 
 ## Remaining operational considerations
 
